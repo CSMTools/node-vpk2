@@ -1,17 +1,21 @@
 {
   "name": "vpk",
   "version": "0.2.0",
-  "description": "parser and extractor for the Valve Pack Format",
-  "main": "index.js",
+  "description": "Parser and extractor for the Valve Pack Format",
+  "main": "build/index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fwdcp/node-vpk.git"
+    "url": "git+https://github.com/CSMTools/node-vpk2.git"
   },
   "keywords": [
     "vpk",
     "Valve"
   ],
   "author": "Forward Command Post (http://fwdcp.net)",
+  "contributors": [
+    "Andrea Mattè (andreamatte97@gmail.com)",
+    "Albin Hedwall"
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/fwdcp/node-vpk/issues"
@@ -19,6 +23,11 @@
   "homepage": "https://github.com/fwdcp/node-vpk#readme",
   "dependencies": {
     "crc": "^3.3.0",
-    "jbinary": "^2.1.3"
+    "jbinary": "^2.1.5"
+  },
+  "devDependencies": {
+    "@types/crc": "^3.8.0",
+    "@types/jbinary": "^2.1.1",
+    "typescript": "^5.1.3"
   }
 }
