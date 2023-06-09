@@ -1,44 +1,41 @@
-# node-vpk
-extractor and creator for the Valve Pack Format
+# node-vpk2
+Extractor and creator for the Valve Pack Format.
 
 ### Prerequisites
-
-Requires fs-extra, jBinary and crc,
-but npm will install them automatically if you follow my instructions
+**Requires Node v13.2.0 and higher.**
+Requires jBinary and crc, but npm/yarn will install them automatically if you follow these instructions.
 
 ### Installing
-globally
+NPM:
+```sh
+npm install vpk2
 ```
-npm install -g vpk
+Yarn:
+```sh
+yarn add vpk2
 ```
-or locally
-```
-npm install vpk
-```
-(Those will also install dependencies, no need to worry about them)
 ### How to use
 
 To extract a V1/V2 VPK:
-```
-const {VPK} = require("node-vpk");
+```js
+import { VPK } from "vpk2";
 
 // load a vpk (V1/V2) (ALWAYS select the _dir file)
-var my_vpk = new VPK("C:/Programs("C:/Program Files (x86)/Steam/steamapps/common/dota 2 beta/game/dota/pak01_dir");
+let my_vpk = new VPK("FILE_LOCATION_HERE");
 my_vpk.load();
 
 // extract it
-my_vpk.extract("C:/Users/Public/Desktop/pak01_dir");
+my_vpk.extract("FILE_LOCATION_HERE");
 ```
 
-To create a V1 vpk (V2 coming soon):
-```
-const {VPKcreator} = require("node-vpk");
+To create a V1 VPK (V2 is not currently supported):
+```js
+import { VPKcreator } from "vpk2";
 
-// load a directory
-var my_vpk = new VPKcreator("C:/Users/Public/Desktop/pak01_dir");
+// Load a directory
+var my_vpk = new VPKcreator("FILE_LOCATION_HERE");
 my_vpk.load();
 
-// save it as .vpk
-my_vpk.save("C:/Users/Public/Desktop/my_created_vpk.vpk");
+// Save it as .vpk
+my_vpk.save("FILE_LOCATION_HERE");
 ```
-	

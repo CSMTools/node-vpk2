@@ -4,15 +4,7 @@ import crc from 'crc'
 import fs from 'fs'
 import jBinary from 'jbinary'
 
-type Header = {
-	version?: number;
-	treeLength?: number;
-	footerLength?: number;
-	unknown1?: any;
-	unknown2?: any;
-	unknown3?: any;
-	unknown4?: any;
-}
+import { Header, FileTreeEntry, FileTree, FileData } from './types';
 
 let TYPESET = {
 	'jBinary.littleEndian': true,
@@ -22,6 +14,7 @@ let TYPESET = {
 			let header: Header = {};
 
 			let signature = this.binary.read('uint32');
+			console.log(signature);
 			if (signature !== 0x55aa1234) {
 				throw new Error('VPK signature is invalid');
 			}
@@ -42,14 +35,12 @@ let TYPESET = {
 
 			return header;
 		},
-		write: function () {
-
-		}
+		write: function () { }
 	}),
 
 	vpkDirectoryEntry: jBinary.Type({
 		read: function () {
-			let entry = this.binary.read({
+			let entry: FileTreeEntry = this.binary.read({
 				crc: 'uint32',				// crc integrity
 				preloadBytes: 'uint16',		// size of preload (almost always 0) (used for small but critical files)
 				archiveIndex: 'uint16',		// on which archive the data is stored (7fff means on _dir archive)
@@ -57,18 +48,19 @@ let TYPESET = {
 				entryLength: 'uint32'		// size of data
 			});
 
-			let terminator = this.binary.read('uint16');
+			let terminator: number = this.binary.read('uint16');
 			if (terminator !== 0xffff) {
-				throw new Error('directory terminator is invalid');
+				throw new Error('Directory terminator is invalid');
 			}
 
 			return entry;
-		}
+		},
+		write: function () { }
 	}),
 
 	vpkTree: jBinary.Type({
 		read: function () {
-			let files = {};
+			let files: FileTree = {};
 
 			while (true) {
 				let extension = this.binary.read('string0');
@@ -85,13 +77,13 @@ let TYPESET = {
 					}
 
 					while (true) {
-						let filename = this.binary.read('string0');
+						let filename: string = this.binary.read('string0');
 
 						if (filename === '') {
 							break;
 						}
 
-						let fullPath = filename;
+						let fullPath: string = filename;
 						if (fullPath === ' ') {
 							fullPath = '';
 						}
@@ -113,8 +105,9 @@ let TYPESET = {
 			}
 
 			return files;
-		}
-	})
+		},
+		write: function () { }
+	}),
 };
 
 // header size in bytes
@@ -124,16 +117,21 @@ let HEADER_2_LENGTH = 28;
 // let MAX_PATH = 260;
 
 class VPK {
-	constructor(path) {
+	directoryPath: string;
+	loaded: boolean;
+	header: Header = {};
+	tree: FileTree = {};
+
+	constructor(path: string) {
 		this.directoryPath = path;
 		this.loaded = false;
 	}
 
 	isValid() {
-		let header = new Buffer(HEADER_2_LENGTH);
+		let header = Buffer.alloc(HEADER_2_LENGTH);
 		let directoryFile = fs.openSync(this.directoryPath, 'r');
 		fs.readSync(directoryFile, header, 0, HEADER_2_LENGTH, 0);
-		let binary = new jBinary(header, TYPESET);
+		let binary = new jBinary(header.toString(), TYPESET);
 
 		try {
 			binary.read('vpkHeader');
@@ -146,13 +144,16 @@ class VPK {
 	}
 
 	load() {
+		// Using .toString() for some reason fucks up the file, and gives the completely wrong values.
+		//@ts-ignore
 		let binary = new jBinary(fs.readFileSync(this.directoryPath), TYPESET);
 
 		try {
-			this.header = binary.read('vpkHeader');
-			this.tree = binary.read('vpkTree');
+			this.header = binary.read('vpkHeader') as Header;
+			this.tree = binary.read('vpkTree') as FileTree;
 			this.loaded = true;
 		} catch (error) {
+			console.log(error)
 			throw new Error('Failed loading ' + this.directoryPath);
 		}
 	}
@@ -161,14 +162,14 @@ class VPK {
 		return Object.keys(this.tree);
 	}
 
-	getFile(path) {
-		let entry = this.tree[path];
+	getFile(path: string) {
+		let entry: FileTreeEntry = this.tree[path];
 
-		if (!entry) {
-			return null;
+		if (!entry || !entry.preloadOffset) {
+			throw new Error('No such file in tree')
 		}
 
-		let file = new Buffer(entry.preloadBytes + entry.entryLength);
+		let file = Buffer.alloc(entry.preloadBytes + entry.entryLength);
 
 		if (entry.preloadBytes > 0) {
 			let directoryFile = fs.openSync(this.directoryPath, 'r');
@@ -177,19 +178,17 @@ class VPK {
 
 		if (entry.entryLength > 0) {
 			if (entry.archiveIndex === 0x7fff) {
-				let offset = this.header.treeLength;
+				let offset = this.header.treeLength ?? 0;
 
 				if (this.header.version === 1) {
 					offset += HEADER_1_LENGTH;
-				}
-				else if (this.header.version === 2) {
+				} else if (this.header.version === 2) {
 					offset += HEADER_2_LENGTH;
 				}
 
 				let directoryFile = fs.openSync(this.directoryPath, 'r');
 				fs.readSync(directoryFile, file, entry.preloadBytes, entry.entryLength, offset + entry.entryOffset);
-			}
-			else {
+			} else {
 				// read from specified archive
 				let fileIndex = ('000' + entry.archiveIndex).slice(-3);
 				let archivePath = this.directoryPath.replace(/_dir\.vpk$/, '_' + fileIndex + '.vpk');
@@ -206,7 +205,7 @@ class VPK {
 		return file;
 	}
 
-	extract(destinationDir) {
+	extract(destinationDir: string) {
 		// if not loaded yet, load it
 		if (this.loaded === false) {
 			try {
@@ -216,31 +215,37 @@ class VPK {
 			}
 		}
 
-		var failed = [];
+		let failed = [];
 		// make sure destinationDir exists
 		try {
-			fs.ensureDirSync(destinationDir);
+			if (!fs.existsSync(destinationDir)) {
+				fs.mkdirSync(destinationDir, { recursive: true });
+			}
 		} catch (error) {
 			throw new Error('Destination dir cant be ensured');
 		}
 
 		// extract files one by one
-		for (var file of this.files) {
+		for (let file of this.files) {
 			// destination of this file (with file name and extension)
-			var destFile = destinationDir + '/' + file;
+			let destFile = destinationDir + '/' + file;
 			// destination of this file (only the directory)
-			var fileDestDir = destFile.substr(0, destFile.lastIndexOf('/'));
+			let fileDestDir = destFile.substr(0, destFile.lastIndexOf('/'));
 
 			// make sure destination dir of this file exists
 			try {
-				fs.ensureDirSync(fileDestDir);
+				if (!fs.existsSync(fileDestDir)) {
+					fs.mkdirSync(fileDestDir, { recursive: true });
+				}
 			} catch (error) {
 				throw new Error('Error ensuring file directory: ' + fileDestDir);
 			}
 
 			// get the file
+			let fileBuffer: Buffer;
+
 			try {
-				var fileBuffer = this.getFile(file);
+				fileBuffer = this.getFile(file);
 			} catch (error) {
 				throw error;
 			}
@@ -260,18 +265,17 @@ class VPK {
 	}
 }
 
-function listFiles(directory, first = true, root = directory) {
-	var files = [];
-	var filesHere = fs.readdirSync(directory);
+function listFiles(directory: string, first = true, root = directory) {
+	let files: FileData[] = [];
+	let filesHere = fs.readdirSync(directory);
 	filesHere.forEach(file => {
 		if (fs.statSync(directory + "/" + file).isDirectory()) {
 			files = files.concat(listFiles(directory + "/" + file, false, root));
-		}
-		else {
+		} else {
 			files.push({
-				location: first ? " " : directory.substr(root.length + 1),
-				name: file.substr(0, file.lastIndexOf(".")),
-				extension: file.substr(file.lastIndexOf(".") + 1),
+				location: first ? " " : directory.substring(root.length + 1),
+				name: file.substring(0, file.lastIndexOf(".")),
+				extension: file.substring(file.lastIndexOf(".") + 1),
 				crc: crc.crc32(fs.readFileSync(directory + "/" + file)),
 				dataSize: fs.statSync(directory + "/" + file).size,
 				fullPath: directory + "/" + file
@@ -283,7 +287,14 @@ function listFiles(directory, first = true, root = directory) {
 }
 
 class VPKcreator {
-	constructor(directory) {
+	root: any;
+	loaded: boolean;
+	totalData: number = 0;
+	totalSize: number = 0;
+	treeSize: number = 0;
+	tree: FileData[] = [];
+
+	constructor(directory: string) {
 		this.root = directory;
 		this.loaded = false;
 	}
@@ -299,22 +310,26 @@ class VPKcreator {
 		}
 	}
 
-	// load dir as vpk (only supports VPK 1 atm)
-	load(version = 1) {
+	/**
+	 * Load dir as vpk.
+	 * @param version Only supports VPK 1 atm.
+	 */
+	load(version: 1 = 1) {
 		if (version != 1) {
 			throw new Error("Version not supported");
 		}
+
 		if (this.isValid()) {
 
 			// create all entries
-			var files = listFiles(this.root);
+			let files = listFiles(this.root);
 
 			// calculate total size of entries
-			var totalSize = 0;
+			let totalSize = 0;
 			totalSize += 4; // signature
 			totalSize += 4; // vpk version
 			totalSize += 4; // treeSize
-			var treeSize = 0;
+			let treeSize = 0;
 			this.totalData = 0;
 			files.forEach(file => {
 				let entrySize = 0;
@@ -334,7 +349,7 @@ class VPKcreator {
 			totalSize += treeSize;
 
 			// set all offsets
-			var offset = 0; // offset from tree end
+			let offset = 0; // offset from tree end
 			files.forEach(file => {
 				file.dataOffset = offset;
 				offset += file.dataSize;
@@ -348,25 +363,29 @@ class VPKcreator {
 		}
 	}
 
-	save(destinationFile) {
+	save(destinationFile: string) {
 		// header
-		var header = new Buffer(HEADER_1_LENGTH);
+		let header = Buffer.alloc(HEADER_1_LENGTH);
 		header.writeUInt32LE(0x55aa1234, 0);
 		header.writeUInt32LE(1, 4);
 		header.writeUInt32LE(this.treeSize, 8);
 
 		// tree
-		var tree = new Buffer(this.treeSize);
-		var offset = 0;
+		let tree = Buffer.alloc(this.treeSize);
+		let offset = 0;
 		this.tree.forEach(file => {
+			if (!file.entrySize || !file.dataOffset) {
+				return;
+			}
+
 			console.log(file);
 			tree.write(file.extension + "\0" + file.location + "\0" + file.name + "\0", offset);
 			let relOff = offset + file.entrySize - 20;
-			tree.writeUInt32LE(file.crc, relOff);				// crc
-			tree.writeUInt16LE(0x0000, relOff + 4);				// preloadByes
-			tree.writeUInt16LE(0x7fff, relOff + 6);				// archiveIndex
+			tree.writeUInt32LE(file.crc, relOff);					// crc
+			tree.writeUInt16LE(0x0000, relOff + 4);					// preloadByes
+			tree.writeUInt16LE(0x7fff, relOff + 6);					// archiveIndex
 			tree.writeUInt32LE(file.dataOffset, relOff + 8);		// entryOffset
-			tree.writeUInt32LE(file.dataSize, relOff + 12);		// entryLength
+			tree.writeUInt32LE(file.dataSize, relOff + 12);			// entryLength
 			tree.writeUInt16LE(0xffff, relOff + 16);				// terminator
 			tree.write("\0\0", relOff + 18);						// 2 nulls
 
@@ -377,7 +396,7 @@ class VPKcreator {
 		fs.writeFileSync(destinationFile, Buffer.concat([header, tree]));
 
 		// data
-		var data = new Buffer(this.totalData);
+		let data = Buffer.alloc(this.totalData);
 		this.tree.forEach(file => {
 			console.log(file);
 			let fileData = fs.readFileSync(file.fullPath);
@@ -386,4 +405,4 @@ class VPKcreator {
 	}
 }
 
-module.exports = { VPK, VPKcreator };
+export { VPK, VPKcreator };

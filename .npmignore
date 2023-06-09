@@ -1,2 +1,5 @@
-test
 .gitignore
+tsconfig.json
+types.ts
+index.ts
+yarn.lock
