@@ -1,6 +1,6 @@
 {
   "name": "vpk2",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Parser and extractor for the Valve Pack Format",
   "main": "build/index.js",
   "type": "module",
@@ -22,9 +22,9 @@
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/fwdcp/node-vpk/issues"
+    "url": "https://github.com/CSMTools/node-vpk2/issues"
   },
-  "homepage": "https://github.com/fwdcp/node-vpk#readme",
+  "homepage": "https://github.com/CSMTools/node-vpk2#readme",
   "dependencies": {
     "crc": "^3.3.0",
     "jbinary": "^2.1.5"
