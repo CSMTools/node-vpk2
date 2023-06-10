@@ -153,7 +153,6 @@ class VPK {
 			this.tree = binary.read('vpkTree') as FileTree;
 			this.loaded = true;
 		} catch (error) {
-			console.log(error)
 			throw new Error('Failed loading ' + this.directoryPath);
 		}
 	}
@@ -378,7 +377,6 @@ class VPKcreator {
 				return;
 			}
 
-			console.log(file);
 			tree.write(file.extension + "\0" + file.location + "\0" + file.name + "\0", offset);
 			let relOff = offset + file.entrySize - 20;
 			tree.writeUInt32LE(file.crc, relOff);					// crc
@@ -398,7 +396,6 @@ class VPKcreator {
 		// data
 		let data = Buffer.alloc(this.totalData);
 		this.tree.forEach(file => {
-			console.log(file);
 			let fileData = fs.readFileSync(file.fullPath);
 			fs.appendFileSync(destinationFile, fileData);
 		});
