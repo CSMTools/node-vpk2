@@ -1,6 +1,6 @@
 {
   "name": "vpk2",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Parser and extractor for the Valve Pack Format",
   "main": "build/index.js",
   "type": "module",
@@ -8,8 +8,8 @@
     "type": "git",
     "url": "git+https://github.com/CSMTools/node-vpk2.git"
   },
-  "engines" : { 
-    "node" : ">=13.2.0"
+  "engines": {
+    "node": ">=13.2.0"
   },
   "keywords": [
     "vpk",
