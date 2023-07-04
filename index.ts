@@ -14,7 +14,6 @@ let TYPESET = {
 			let header: Header = {};
 
 			let signature = this.binary.read('uint32');
-			console.log(signature);
 			if (signature !== 0x55aa1234) {
 				throw new Error('VPK signature is invalid');
 			}
