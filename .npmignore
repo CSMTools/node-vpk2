@@ -1,5 +1,6 @@
 .gitignore
 tsconfig.json
-types.ts
-index.ts
+tsconfig-cjs.json
+tsconfig-base.json
+src/
 yarn.lock
